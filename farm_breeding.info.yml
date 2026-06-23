@@ -11,5 +11,6 @@ dependencies:
   - farm:farm_entity
   - farm:farm_animal
   - farm:farm_flag
+  - farm:farm_quick
   - farm:farm_ui_views
   - log:log
