@@ -1,0 +1,547 @@
+<?php
+
+/**
+ * @file
+ * Farm Breeding module.
+ *
+ * Uses standard Drupal entity hooks (no contrib event dispatcher required):
+ *  - hook_entity_presave()  → auto-populate due dates on Breeding logs
+ *  - hook_entity_insert()   → lifecycle + stage on Birth/PregnancyCheck/Animal
+ *  - hook_entity_update()   → re-run Birth log side effects on edit
+ *  - hook_views_pre_build() → add asset name + date columns to breeding log views
+ */
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\views\ViewExecutable;
+
+// ======================================================================== //
+// ANIMAL ASSET — animal_stage BUNDLE FIELD                                 //
+// ======================================================================== //
+
+/**
+ * Implements hook_farm_entity_bundle_field_info().
+ *
+ * Adds the species-neutral 'animal_stage' field to Animal assets.
+ */
+function farm_breeding_farm_entity_bundle_field_info(EntityTypeInterface $entity_type, string $bundle): array {
+  $fields = [];
+
+  if ($entity_type->id() === 'asset' && $bundle === 'animal') {
+    $fields['animal_stage'] = \Drupal::service('farm_field.factory')->bundleFieldDefinition([
+      'type'        => 'list_string',
+      'label'       => t('Life stage'),
+      'description' => t('Current reproductive/age stage. Set automatically on creation and when birth logs are recorded. Species-specific terms (heifer, doe, gilt, lamb…) shown in parentheses.'),
+      'allowed_values' => [
+        'juvenile'        => t('Juvenile — calf / kid / lamb / piglet / foal'),
+        'immature_female' => t('Immature female — heifer / doeling / gilt / ewe lamb / filly'),
+        'mature_female'   => t('Mature female — cow / doe / sow / ewe / mare'),
+        'intact_male'     => t('Intact male — bull / buck / boar / ram / stallion'),
+        'castrated_male'  => t('Castrated male — steer / wether / barrow / gelding'),
+      ],
+      'weight' => ['form' => 15, 'view' => 15],
+    ]);
+  }
+
+  return $fields;
+}
+
+// ======================================================================== //
+// MODULE LIFECYCLE                                                         //
+// ======================================================================== //
+
+/**
+ * Implements hook_module_preuninstall().
+ *
+ * Runs BEFORE entity_module_preuninstall() because farm_breeding has
+ * weight: -1 while entity module has the default weight of 0.  This gives us
+ * a chance to put the database in a consistent state before uninstallBundles()
+ * calls onFieldDefinitionDelete() on each bundle field.
+ *
+ * Two things can make uninstallBundles() crash:
+ * 1. Missing field tables — onFieldDefinitionDelete() issues an UPDATE against
+ *    the field table.  If a previous uninstall crashed partway the table may
+ *    have been renamed to field_deleted_* already, or may never have been
+ *    created at all.
+ * 2. Stale field_deleted_* rename targets — onFieldStorageDefinitionDelete()
+ *    renames log__{field} → field_deleted_data_{hash}.  If the same hash
+ *    name already exists from a prior failed attempt, the rename fails.
+ *
+ * We fix both here so that entity_module_preuninstall() can run cleanly.
+ */
+function farm_breeding_module_preuninstall(string $module): void {
+  if ($module !== 'farm_breeding') {
+    return;
+  }
+
+  $schema = \Drupal::database()->schema();
+
+  // Drop any field_deleted_* tables left by prior failed uninstall attempts
+  // — they block the rename step in onFieldStorageDefinitionDelete().
+  foreach ($schema->findTables('field_deleted%') as $table) {
+    $schema->dropTable($table);
+  }
+
+  // Ensure all log bundle field tables exist for both bundles.
+  // If tables are missing or in an inconsistent state (e.g. data table was
+  // renamed but revision table was not), we drop whichever partial table
+  // remains and recreate both via onFieldStorageDefinitionCreate().
+  $log_storage = \Drupal::entityTypeManager()->getStorage('log');
+  $table_mapping = $log_storage->getTableMapping();
+  $bundle_handler = \Drupal::entityTypeManager()->getHandler('log', 'bundle_plugin');
+
+  foreach (['breeding', 'pregnancy_check'] as $bundle) {
+    foreach ($bundle_handler->getFieldDefinitions($bundle) as $def) {
+      $field_storage_def = $def->getFieldStorageDefinition();
+
+      if (!$table_mapping->requiresDedicatedTableStorage($field_storage_def)) {
+        continue;
+      }
+
+      $data_table = $table_mapping->getDedicatedDataTableName($field_storage_def);
+      // Revision table name follows the convention log_revision__{field}.
+      $revision_table = 'log_revision__' . substr($data_table, strlen('log__'));
+
+      if ($schema->tableExists($data_table) && $schema->tableExists($revision_table)) {
+        // Both tables are present — nothing to do.
+        continue;
+      }
+
+      // Drop whichever partial table exists and recreate both cleanly.
+      foreach ([$data_table, $revision_table] as $t) {
+        if ($schema->tableExists($t)) {
+          $schema->dropTable($t);
+        }
+      }
+      // Creates both the data and revision tables directly (no key-value update).
+      $log_storage->onFieldStorageDefinitionCreate($field_storage_def);
+    }
+  }
+
+  // Ensure the animal_stage field tables exist on the asset entity type.
+  // ModuleInstaller::uninstall() (lines 596-600) calls
+  // EntityDefinitionUpdateManager::uninstallFieldStorageDefinition() for every
+  // field whose provider matches 'farm_breeding' — including animal_stage.
+  // That call invokes countFieldData() which queries asset_revision__animal_stage.
+  // If the table is missing it crashes exactly as the log field tables do.
+  $asset_field_defs = \Drupal::service('entity_field.manager')
+    ->getFieldStorageDefinitions('asset');
+  if (isset($asset_field_defs['animal_stage'])
+      && $asset_field_defs['animal_stage']->getProvider() === 'farm_breeding') {
+    $animal_stage_def = $asset_field_defs['animal_stage'];
+    $asset_storage = \Drupal::entityTypeManager()->getStorage('asset');
+    $asset_table_mapping = $asset_storage->getTableMapping();
+    $asset_data_table = $asset_table_mapping->getDedicatedDataTableName($animal_stage_def);
+    $asset_revision_table = 'asset_revision__' . substr($asset_data_table, strlen('asset__'));
+
+    if (!$schema->tableExists($asset_data_table) || !$schema->tableExists($asset_revision_table)) {
+      foreach ([$asset_data_table, $asset_revision_table] as $t) {
+        if ($schema->tableExists($t)) {
+          $schema->dropTable($t);
+        }
+      }
+      $asset_storage->onFieldStorageDefinitionCreate($animal_stage_def);
+    }
+  }
+}
+
+// ======================================================================== //
+// ENTITY HOOKS                                                              //
+// ======================================================================== //
+
+/**
+ * Implements hook_entity_presave().
+ *
+ * Auto-populates calculated fields on Breeding logs before save.
+ * Runs on both insert and update.
+ *
+ * NOTE ON TIMESTAMP HANDLING:
+ * farmOS log timestamps come in as integer Unix timestamps from the form.
+ * We cast explicitly and guard against 0/null to avoid silent bail-outs.
+ *
+ * NOTE ON SPECIES INFERENCE:
+ * SpeciesResolver::resolveFromLogAssets() explicitly loads asset and term
+ * entities by ID — it does not rely on the ->entity magic property which
+ * is not guaranteed to be populated during presave on new logs.
+ */
+function farm_breeding_entity_presave(EntityInterface $entity): void {
+  if ($entity->getEntityTypeId() !== 'log' || $entity->bundle() !== 'breeding') {
+    return;
+  }
+
+  /** @var \Drupal\farm_breeding\Service\GestationCalculator $calc */
+  $calc = \Drupal::service('farm_breeding.gestation_calculator');
+  /** @var \Drupal\farm_breeding\Service\SpeciesResolver $resolver */
+  $resolver = \Drupal::service('farm_breeding.species_resolver');
+
+  // 1. Default lifecycle status on new records.
+  if ($entity->isNew() && $entity->get('breeding_lifecycle_status')->isEmpty()) {
+    $entity->set('breeding_lifecycle_status', 'bred');
+  }
+
+  // 2. Infer species from dam asset(s) if not already set.
+  if ($entity->get('breeding_animal_type')->isEmpty()) {
+    $resolved = $resolver->resolveFromLogAssets($entity);
+    if ($resolved !== NULL) {
+      $entity->set('breeding_animal_type', $resolved);
+    }
+  }
+
+  $animal_type = $entity->get('breeding_animal_type')->value;
+  if (empty($animal_type)) {
+    // Can't calculate without a known species — still save the log cleanly.
+    return;
+  }
+
+  // 3. Get the conception timestamp. Cast to int; treat 0 as missing.
+  $conception_ts = (int) $entity->get('timestamp')->value;
+  $turn_in_ts    = $entity->get('breeding_turn_in_date')->value;
+  $turn_out_ts   = $entity->get('breeding_turn_out_date')->value;
+
+  // Cast optional timestamps — may be null or empty string from form.
+  $turn_in_ts  = !empty($turn_in_ts)  ? (int) $turn_in_ts  : null;
+  $turn_out_ts = !empty($turn_out_ts) ? (int) $turn_out_ts : null;
+
+  // 4. Store typical gestation days for display/reference.
+  $typical = $calc->getTypicalDays($animal_type);
+  if ($typical !== NULL) {
+    $entity->set('breeding_gestation_days', $typical);
+  }
+
+  // All remaining calculations require a valid conception timestamp.
+  if ($conception_ts <= 0) {
+    return;
+  }
+
+  // 5. Expected due date — only set if not already manually provided.
+  //    We check for null value rather than isEmpty() to avoid treating
+  //    a valid timestamp of 0 (epoch) as empty.
+  $current_due = $entity->get('breeding_due_date')->value;
+  if ($current_due === null) {
+    $due = $calc->calculateDueDate($conception_ts, $animal_type);
+    if ($due !== NULL) {
+      $entity->set('breeding_due_date', $due);
+    }
+  }
+
+  // 6. Calving window min — from turn-in date if set (pasture breeding),
+  //    otherwise from the confirmed breeding/AI date.
+  $earliest_base = $turn_in_ts ?? $conception_ts;
+  $earliest = $calc->calculateEarliestDueDate($earliest_base, $animal_type);
+  if ($earliest !== NULL) {
+    $entity->set('breeding_due_date_min', $earliest);
+  }
+
+  // 7. Calving window max — from turn-out date if set, else conception.
+  $latest_base = $turn_out_ts ?? $conception_ts;
+  $latest = $calc->calculateLatestDueDate($latest_base, $animal_type);
+  if ($latest !== NULL) {
+    $entity->set('breeding_due_date_max', $latest);
+  }
+
+  // 8. Pregnancy check due date.
+  $check_due = $calc->calculateCheckDueDate($conception_ts, $animal_type);
+  if ($check_due !== NULL) {
+    $entity->set('breeding_check_due_date', $check_due);
+  }
+}
+
+/**
+ * Implements hook_entity_insert().
+ */
+function farm_breeding_entity_insert(EntityInterface $entity): void {
+  _farm_breeding_handle_log_save($entity);
+  _farm_breeding_handle_animal_insert($entity);
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function farm_breeding_entity_update(EntityInterface $entity): void {
+  if ($entity->getEntityTypeId() === 'log' && $entity->bundle() === 'birth') {
+    _farm_breeding_handle_birth_log($entity);
+  }
+}
+
+// ======================================================================== //
+// INTERNAL — LOG SAVE HANDLERS                                              //
+// ======================================================================== //
+
+/**
+ * Routes log saves to the appropriate handler.
+ * @internal
+ */
+function _farm_breeding_handle_log_save(EntityInterface $entity): void {
+  if ($entity->getEntityTypeId() !== 'log') {
+    return;
+  }
+  if ($entity->bundle() === 'pregnancy_check') {
+    \Drupal::service('farm_breeding.lifecycle_manager')->handlePregnancyCheckSaved($entity);
+    return;
+  }
+  if ($entity->bundle() === 'birth') {
+    _farm_breeding_handle_birth_log($entity);
+  }
+}
+
+/**
+ * Handles all side effects of a Birth log save.
+ * @internal
+ */
+function _farm_breeding_handle_birth_log(EntityInterface $birth_log): void {
+  if ($birth_log->bundle() !== 'birth') {
+    return;
+  }
+  \Drupal::service('farm_breeding.lifecycle_manager')->handleBirthLogSaved($birth_log);
+  _farm_breeding_backpropagate_birth_data($birth_log);
+}
+
+/**
+ * Back-propagates twin flag and birth weight to the breeding log.
+ * @internal
+ */
+function _farm_breeding_backpropagate_birth_data(EntityInterface $birth_log): void {
+  $asset_ids = [];
+  foreach ($birth_log->get('asset') as $ref) {
+    if (!empty($ref->target_id)) {
+      $asset_ids[] = (int) $ref->target_id;
+    }
+  }
+  if (empty($asset_ids)) {
+    return;
+  }
+
+  $log_storage = \Drupal::entityTypeManager()->getStorage('log');
+  $ids = $log_storage->getQuery()
+    ->condition('type', 'breeding')
+    ->condition('breeding_lifecycle_status', 'calved')
+    ->condition('asset', $asset_ids, 'IN')
+    ->sort('changed', 'DESC')
+    ->range(0, 1)
+    ->accessCheck(FALSE)
+    ->execute();
+
+  if (empty($ids)) {
+    return;
+  }
+
+  $breeding_log = $log_storage->load(reset($ids));
+  if (!$breeding_log) {
+    return;
+  }
+
+  $changed = FALSE;
+
+  // Twin flag.
+  $birth_ts = (int) $birth_log->get('timestamp')->value;
+  if ($birth_ts > 0) {
+    $day_start = strtotime('today', $birth_ts);
+    $day_end   = $day_start + 86399;
+    $count = (int) \Drupal::entityTypeManager()->getStorage('asset')->getQuery()
+      ->condition('type', 'animal')
+      ->condition('birthdate', [$day_start, $day_end], 'BETWEEN')
+      ->condition('parent', $asset_ids, 'IN')
+      ->accessCheck(FALSE)
+      ->count()
+      ->execute();
+
+    if ($count > 1 && $breeding_log->hasField('breeding_twin_flag')) {
+      $breeding_log->set('breeding_twin_flag', TRUE);
+      $changed = TRUE;
+    }
+  }
+
+  // Birth weight back-prop.
+  if ($breeding_log->hasField('breeding_birth_weight')
+      && $breeding_log->get('breeding_birth_weight')->isEmpty()) {
+    $weight = _farm_breeding_find_birth_weight($birth_log);
+    if ($weight !== NULL) {
+      $breeding_log->set('breeding_birth_weight', $weight);
+      $changed = TRUE;
+    }
+  }
+
+  if ($changed) {
+    $breeding_log->save();
+  }
+}
+
+/**
+ * Finds birth weight from an Observation log created alongside the birth.
+ * @internal
+ */
+function _farm_breeding_find_birth_weight(EntityInterface $birth_log): ?float {
+  $birth_ts = (int) $birth_log->get('timestamp')->value;
+  if ($birth_ts <= 0) {
+    return NULL;
+  }
+
+  $log_storage = \Drupal::entityTypeManager()->getStorage('log');
+  $ids = $log_storage->getQuery()
+    ->condition('type', 'observation')
+    ->condition('timestamp', [$birth_ts - 60, $birth_ts + 60], 'BETWEEN')
+    ->sort('id', 'DESC')
+    ->range(0, 5)
+    ->accessCheck(FALSE)
+    ->execute();
+
+  foreach ($log_storage->loadMultiple($ids) as $obs) {
+    if (!$obs->hasField('quantity') || $obs->get('quantity')->isEmpty()) {
+      continue;
+    }
+    foreach ($obs->get('quantity') as $qty_ref) {
+      $qty = $qty_ref->entity;
+      if ($qty && $qty->hasField('value') && !$qty->get('value')->isEmpty()) {
+        return (float) $qty->get('value')->value;
+      }
+    }
+  }
+
+  return NULL;
+}
+
+// ======================================================================== //
+// INTERNAL — ANIMAL ASSET INSERT HANDLER                                   //
+// ======================================================================== //
+
+/**
+ * Sets initial animal_stage on new Animal assets.
+ * @internal
+ */
+function _farm_breeding_handle_animal_insert(EntityInterface $entity): void {
+  if ($entity->getEntityTypeId() !== 'asset' || $entity->bundle() !== 'animal') {
+    return;
+  }
+  if (!$entity->hasField('animal_stage') || !$entity->get('animal_stage')->isEmpty()) {
+    return;
+  }
+  if (!\Drupal::config('farm_breeding.settings')->get('auto_set_initial_stage')) {
+    return;
+  }
+
+  $stage = \Drupal::service('farm_breeding.animal_stage_manager')
+    ->deriveStageFromNativeFields($entity);
+
+  if ($stage !== NULL) {
+    $entity->set('animal_stage', $stage);
+    $entity->save();
+  }
+}
+
+// ======================================================================== //
+// FIELD CALLBACKS                                                           //
+// ======================================================================== //
+
+/**
+ * Returns animal type options for the breeding_animal_type select field.
+ */
+function farm_breeding_animal_type_options(): array {
+  return \Drupal::service('farm_breeding.gestation_calculator')->getAnimalTypeOptions();
+}
+
+// ======================================================================== //
+// VIEWS INTEGRATION                                                         //
+// ======================================================================== //
+
+/**
+ * Implements hook_farm_ui_views_bundle_options().
+ *
+ * Registers log types so farmOS auto-generates listing pages at
+ * /logs/breeding and /logs/pregnancy-check with proper asset name display.
+ */
+function farm_breeding_farm_ui_views_bundle_options(string $entity_type): array {
+  $options = [];
+  if ($entity_type === 'log') {
+    $options['breeding']        = t('Breeding');
+    $options['pregnancy_check'] = t('Pregnancy Check');
+  }
+  return $options;
+}
+
+/**
+ * Implements hook_farm_ui_views_base_fields().
+ *
+ * Bundle fields are auto-included by farm_ui_views. No base fields to add.
+ */
+function farm_breeding_farm_ui_views_base_fields(string $entity_type): array {
+  return [];
+}
+
+/**
+ * Implements hook_views_pre_build().
+ *
+ * Fixes the breeding_sire entity reference field so the view shows the sire
+ * animal's name instead of its raw numeric entity ID.
+ *
+ * WHY HERE AND NOT IN A YAML:
+ * The farmOS generic log view (views.view.farm_log) is shared across all log
+ * types. farm_ui_views adds all bundle fields via hook_views_pre_view(), but
+ * entity_reference fields are added as raw target_id columns (rendering the
+ * numeric ID). We correct the formatter here in hook_views_pre_build(), which
+ * fires after hook_views_pre_view(), so we can modify the already-added field.
+ *
+ * WHY page_type AND NOT 'breeding':
+ * farm_ui_views uses a single page_type display with a URL argument for the
+ * bundle (e.g. /logs/breeding → page_type display, args[0] = 'breeding').
+ * There is no dedicated 'breeding' display in views.view.farm_log.
+ */
+function farm_breeding_views_pre_build(ViewExecutable $view): void {
+  if ($view->id() !== 'farm_log') {
+    return;
+  }
+
+  $display = $view->current_display ?? '';
+  if ($display !== 'page_type') {
+    return;
+  }
+
+  // Detect the bundle from the first URL argument set by farm_ui_views.
+  $bundle = $view->args[0] ?? '';
+  if (!in_array($bundle, ['breeding', 'pregnancy_check'], TRUE)) {
+    return;
+  }
+
+  if ($bundle === 'breeding') {
+    _farm_breeding_fix_sire_column($view);
+  }
+}
+
+/**
+ * Overrides the sire field formatter to show the animal name instead of ID.
+ *
+ * farm_ui_views adds entity_reference bundle fields using the raw target_id
+ * column, which renders as a numeric entity ID. We switch the formatter to
+ * entity_reference_label so the sire animal's name (label) is shown.
+ *
+ * @internal
+ */
+function _farm_breeding_fix_sire_column(ViewExecutable $view): void {
+  $display_id = $view->current_display;
+  $display = $view->displayHandlers->get($display_id);
+  $fields = $display->getOption('fields');
+
+  if (empty($fields) || !isset($fields['breeding_sire_target_id'])) {
+    return;
+  }
+
+  $fields['breeding_sire_target_id']['type'] = 'entity_reference_label';
+  $fields['breeding_sire_target_id']['settings']['link'] = TRUE;
+  $display->setOption('fields', $fields);
+}
+
+/**
+ * Implements hook_views_data_alter().
+ *
+ * Ensures the breeding_due_date timestamp field uses the 'date' plugin so
+ * farm_ui_views renders it as a formatted date rather than a raw integer.
+ */
+function farm_breeding_views_data_alter(array &$data): void {
+  // Ensure breeding_due_date is exposed as a proper date field in Views data.
+  if (isset($data['log__breeding_due_date'])) {
+    // Override the field plugin to 'date' so it formats correctly.
+    if (isset($data['log__breeding_due_date']['breeding_due_date_value'])) {
+      $data['log__breeding_due_date']['breeding_due_date_value']['field']['id'] = 'date';
+    }
+  }
+}
+

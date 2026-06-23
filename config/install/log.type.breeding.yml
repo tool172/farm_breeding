@@ -1,0 +1,12 @@
+langcode: en
+status: true
+dependencies:
+  enforced:
+    module:
+      - farm_breeding
+id: breeding
+label: 'Breeding'
+description: 'Record a breeding event. Species is inferred from the dam asset; due date is auto-calculated.'
+name_pattern: 'Breeding: [log:asset] [log:timestamp:date]'
+workflow: farm_log_workflow
+new_revision: true

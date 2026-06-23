@@ -1,0 +1,9 @@
+{
+  "name": "drupal/farm_breeding",
+  "description": "Breeding and pregnancy check log types with lifecycle state machine and gestation calculation for farmOS.",
+  "type": "drupal-module",
+  "license": "GPL-2.0-or-later",
+  "require": {
+    "drupal/farm": "^4.0"
+  }
+}

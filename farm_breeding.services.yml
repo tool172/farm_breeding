@@ -1,0 +1,32 @@
+services:
+
+  farm_breeding.gestation_calculator:
+    class: Drupal\farm_breeding\Service\GestationCalculator
+    arguments:
+      - '@config.factory'
+
+  farm_breeding.species_resolver:
+    class: Drupal\farm_breeding\Service\SpeciesResolver
+    arguments:
+      - '@farm_breeding.gestation_calculator'
+      - '@config.factory'
+
+  farm_breeding.animal_stage_manager:
+    class: Drupal\farm_breeding\Service\AnimalStageManager
+    arguments:
+      - '@config.factory'
+      - '@logger.channel.farm_breeding'
+
+  farm_breeding.lifecycle_manager:
+    class: Drupal\farm_breeding\Service\BreedingLifecycleManager
+    arguments:
+      - '@entity_type.manager'
+      - '@farm_breeding.gestation_calculator'
+      - '@farm_breeding.species_resolver'
+      - '@farm_breeding.animal_stage_manager'
+      - '@config.factory'
+      - '@logger.channel.farm_breeding'
+
+  logger.channel.farm_breeding:
+    parent: logger.channel_base
+    arguments: ['farm_breeding']

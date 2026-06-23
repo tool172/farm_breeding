@@ -1,0 +1,15 @@
+name: Farm Breeding
+description: 'Breeding and pregnancy check log types with lifecycle state machine, species-inferred gestation calculation, and farm_birth integration for farmOS livestock operations.'
+type: module
+package: farmOS Contrib
+core_version_requirement: ^10 || ^11
+# Weight -1 ensures farm_breeding_module_preuninstall() runs before
+# entity_module_preuninstall() so we can restore any missing field tables
+# before uninstallBundles() tries to act on them.
+weight: -1
+dependencies:
+  - farm:farm_entity
+  - farm:farm_animal
+  - farm:farm_flag
+  - farm:farm_ui_views
+  - log:log

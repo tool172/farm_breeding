@@ -1,0 +1,12 @@
+langcode: en
+status: true
+dependencies:
+  enforced:
+    module:
+      - farm_breeding
+id: pregnancy_check
+label: 'Pregnancy Check'
+description: 'Optional pregnancy check result. When linked to a breeding log, updates its lifecycle status automatically.'
+name_pattern: 'Preg check: [log:asset] [log:timestamp:date]'
+workflow: farm_log_workflow
+new_revision: true

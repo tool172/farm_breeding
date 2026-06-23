@@ -1,0 +1,59 @@
+<?php
+
+/**
+ * @file
+ * Install, update, and uninstall functions for farm_breeding.
+ */
+
+declare(strict_types=1);
+
+/**
+ * Implements hook_install().
+ *
+ * installBundles() takes the EntityTypeInterface for the entity type (log),
+ * not a bundle config entity (LogType). The second argument is the list of
+ * module names whose bundle plugins should be installed.
+ */
+function farm_breeding_install(): void {
+  $entity_type = \Drupal::entityTypeManager()->getDefinition('log');
+  \Drupal::service('entity.bundle_plugin_installer')
+    ->installBundles($entity_type, ['farm_breeding']);
+}
+
+/**
+ * Implements hook_uninstall().
+ *
+ * Log bundle field tables (log__breeding_*, log__pregnancy_*) are dropped by
+ * entity_module_preuninstall() → uninstallBundles() which fires before this
+ * hook (entity module has default weight 0; farm_breeding has weight -1, so
+ * farm_breeding_module_preuninstall() runs first to restore any missing tables,
+ * then entity_module_preuninstall() does the actual cleanup).
+ *
+ * The animal_stage field on asset.animal is cleaned up automatically by
+ * ModuleInstaller::uninstall() (core/Extension/ModuleInstaller.php lines
+ * 596-600) which iterates all field storage definitions with provider =
+ * 'farm_breeding' and calls EntityDefinitionUpdateManager::
+ * uninstallFieldStorageDefinition() on each. That handles table removal and
+ * key-value cleanup. We must NOT drop those tables here first or the subsequent
+ * countFieldData() call would crash on a missing table.
+ */
+function farm_breeding_uninstall(): void {
+  // All cleanup is handled automatically — see docblock above.
+}
+
+/**
+ * Implements hook_requirements().
+ */
+function farm_breeding_requirements(string $phase): array {
+  $requirements = [];
+  if ($phase === 'runtime') {
+    if (!\Drupal::moduleHandler()->moduleExists('farm_birth')) {
+      $requirements['farm_breeding_birth'] = [
+        'title' => t('Farm Breeding'),
+        'description' => t('The farm_birth module is not installed. Birth log integration (automatic lifecycle advancement and dam stage promotion) will not work until farm_birth is enabled.'),
+        'severity' => REQUIREMENT_WARNING,
+      ];
+    }
+  }
+  return $requirements;
+}

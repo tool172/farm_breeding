@@ -1,0 +1,160 @@
+# farm_breeding.settings
+# All operational defaults. Override per-site via drush config:set or config/install overrides.
+
+# When TRUE, the dam's animal_stage advances to mature_female when a birth log is saved.
+# Uses the native farmOS sex field — works for cattle, goats, pigs, sheep, horses, etc.
+# Set to FALSE to manage animal_stage manually.
+auto_advance_dam_stage: true
+
+# When TRUE, the animal_stage field is set automatically on new Animal assets
+# based on the native sex + is_sterile + birthdate fields.
+# Animals created via the Birth Quick Form (with sex and birthdate) receive 'juvenile'.
+# Animals without a birthdate receive immature_female or intact_male based on sex.
+# Set to FALSE to set animal_stage entirely manually.
+auto_set_initial_stage: true
+
+# Days after breeding date to suggest a pregnancy check, per species.
+# Set to 0 to disable automatic check scheduling for a species.
+pregnancy_check_days:
+  cattle: 30
+  sheep: 30
+  goat: 30
+  pig: 21
+  horse: 14
+  alpaca: 45
+  llama: 45
+
+# Typical gestation lengths in days, keyed by normalized species name.
+# These are the "expected due date" values.
+gestation_days:
+  cattle: 283
+  beef_cattle: 283
+  dairy_cattle: 279
+  angus: 281
+  hereford: 285
+  simmental: 287
+  charolais: 289
+  holstein: 279
+  jersey: 278
+  sheep: 147
+  goat: 150
+  pig: 114
+  horse: 340
+  pony: 330
+  donkey: 365
+  alpaca: 335
+  llama: 350
+  bison: 285
+  deer: 201
+  elk: 249
+  rabbit: 31
+
+# Minimum gestation (earliest normal birth), in days.
+gestation_days_min:
+  cattle: 279
+  beef_cattle: 279
+  dairy_cattle: 274
+  angus: 275
+  hereford: 278
+  simmental: 280
+  charolais: 282
+  holstein: 272
+  jersey: 270
+  sheep: 144
+  goat: 145
+  pig: 112
+  horse: 320
+  pony: 315
+  donkey: 350
+  alpaca: 315
+  llama: 330
+  bison: 275
+  deer: 195
+  elk: 240
+  rabbit: 28
+
+# Maximum gestation (latest normal birth), in days.
+gestation_days_max:
+  cattle: 287
+  beef_cattle: 287
+  dairy_cattle: 290
+  angus: 287
+  hereford: 292
+  simmental: 295
+  charolais: 296
+  holstein: 290
+  jersey: 285
+  sheep: 152
+  goat: 155
+  pig: 116
+  horse: 370
+  pony: 365
+  donkey: 380
+  alpaca: 360
+  llama: 360
+  bison: 295
+  deer: 210
+  elk: 262
+  rabbit: 35
+
+# Species alias mapping: normalised substrings that map to a canonical key above.
+# Used by SpeciesResolver to match free-text taxonomy terms on animal assets.
+# Order matters — more specific entries should come first.
+species_aliases:
+  Black Baldy: cattle
+  Angus: cattle
+  Hereford: cattle
+  Simmental: cattle
+  Charolais: cattle
+  Limousin: cattle
+  Brahman: cattle
+  Shorthorn: cattle
+  Longhorn: cattle
+  Holstein: dairy_cattle
+  Jersey: dairy_cattle
+  Guernsey: dairy_cattle
+  Brown swiss: dairy_cattle
+  Ayrshire: dairy_cattle
+  dairy: dairy_cattle
+  beef: beef_cattle
+  Cattle: cattle
+  Bovine: cattle
+  Cow: cattle
+  bos taurus: cattle
+  dorper: sheep
+  suffolk: sheep
+  merino: sheep
+  rambouillet: sheep
+  katahdin: sheep
+  hair sheep: sheep
+  sheep: sheep
+  ovine: sheep
+  ewe: sheep
+  lamb: sheep
+  boer: goat
+  nubian: goat
+  kiko: goat
+  alpine: goat
+  saanen: goat
+  goat: goat
+  caprine: goat
+  swine: pig
+  hog: pig
+  pork: pig
+  pig: pig
+  sow: pig
+  gilt: pig
+  mare: horse
+  horse: horse
+  equine: horse
+  pony: pony
+  donkey: donkey
+  burro: donkey
+  alpaca: alpaca
+  llama: llama
+  bison: bison
+  buffalo: bison
+  deer: deer
+  elk: elk
+  wapiti: elk
+  rabbit: rabbit

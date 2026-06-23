@@ -1,0 +1,13 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - farm_animal.asset_type.animal
+  module:
+    - farm_flag
+    - farm_animal
+id: bull
+label: Bull
+entity_types:
+  asset:
+    - animal
