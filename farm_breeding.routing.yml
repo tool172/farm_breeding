@@ -1,0 +1,7 @@
+farm_breeding.settings:
+  path: '/farm/settings/breeding'
+  defaults:
+    _form: 'Drupal\farm_breeding\Form\BreedingSettingsForm'
+    _title: 'Breeding settings'
+  requirements:
+    _permission: 'administer farm'

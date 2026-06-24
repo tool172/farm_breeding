@@ -1,0 +1,129 @@
+protocols:
+
+  5day_cidr_ai:
+    label: '5-Day CIDR + AI'
+    enabled: true
+    method: ai
+    species: [cattle]
+    events:
+      cidr_insert:
+        label: 'CIDR insertion + GnRH'
+        log_type: activity
+        day: 0
+        hour: 0
+      cidr_remove:
+        label: 'CIDR removal + PGF2α'
+        log_type: activity
+        day: 5
+        hour: 0
+      pgf_second:
+        label: 'Second PGF2α injection'
+        log_type: activity
+        day: 5
+        hour: 24
+      gnrh:
+        label: 'GnRH injection'
+        log_type: activity
+        day: 6
+        hour: 24
+      ai:
+        label: 'AI'
+        log_type: breeding
+        day: 6
+        hour: 30
+      preg_check:
+        label: 'Pregnancy check'
+        log_type: pregnancy_check
+        day: 35
+        hour: 0
+
+  7day_cidr_ai:
+    label: '7-Day CIDR + AI'
+    enabled: true
+    method: ai
+    species: [cattle]
+    events:
+      cidr_insert:
+        label: 'CIDR insertion'
+        log_type: activity
+        day: 0
+        hour: 0
+      cidr_remove:
+        label: 'CIDR removal + PGF2α'
+        log_type: activity
+        day: 7
+        hour: 0
+      gnrh:
+        label: 'GnRH injection'
+        log_type: activity
+        day: 9
+        hour: 0
+      ai:
+        label: 'AI'
+        log_type: breeding
+        day: 9
+        hour: 16
+      preg_check:
+        label: 'Pregnancy check'
+        log_type: pregnancy_check
+        day: 37
+        hour: 0
+
+  7day_cidr_et:
+    label: '7-Day CIDR + ET'
+    enabled: true
+    method: et
+    species: [cattle]
+    events:
+      cidr_insert:
+        label: 'CIDR insertion'
+        log_type: activity
+        day: 0
+        hour: 0
+      cidr_remove:
+        label: 'CIDR removal + PGF2α'
+        log_type: activity
+        day: 7
+        hour: 0
+      gnrh:
+        label: 'GnRH injection'
+        log_type: activity
+        day: 9
+        hour: 0
+      et:
+        label: 'Embryo transfer'
+        log_type: breeding
+        day: 16
+        hour: 0
+      preg_check:
+        label: 'Pregnancy check'
+        log_type: pregnancy_check
+        day: 42
+        hour: 0
+
+  co_synch:
+    label: 'CO-Synch + CIDR'
+    enabled: false
+    method: ai
+    species: [cattle]
+    events:
+      gnrh_cidr:
+        label: 'GnRH injection + CIDR insertion'
+        log_type: activity
+        day: 0
+        hour: 0
+      pgf_cidr_remove:
+        label: 'PGF2α injection + CIDR removal'
+        log_type: activity
+        day: 7
+        hour: 0
+      gnrh_ai:
+        label: 'GnRH injection + AI'
+        log_type: breeding
+        day: 9
+        hour: 0
+      preg_check:
+        label: 'Pregnancy check'
+        log_type: pregnancy_check
+        day: 37
+        hour: 0

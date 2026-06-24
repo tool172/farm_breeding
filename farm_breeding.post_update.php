@@ -86,6 +86,13 @@ function farm_breeding_post_update_create_pregnancy_check_tables(&$sandbox): voi
 }
 
 /**
+ * Import protocol runs View from config/install/ on already-installed sites.
+ */
+function farm_breeding_post_update_import_protocol_runs_view(&$sandbox): void {
+  \Drupal::service('config.installer')->installDefaultConfig('module', 'farm_breeding');
+}
+
+/**
  * Install animal_stage bundle field on Animal assets (added in v1beta4).
  *
  * animal_stage belongs to the existing 'animal' bundle which farm_breeding

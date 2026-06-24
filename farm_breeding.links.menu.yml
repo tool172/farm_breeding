@@ -1,0 +1,5 @@
+farm_breeding.settings:
+  title: 'Breeding'
+  parent: farm.settings
+  route_name: farm_breeding.settings
+  description: 'Configure reproductive protocols and breeding defaults.'
