@@ -275,9 +275,21 @@ class ReproductiveProtocol extends QuickFormBase {
     $lot_id     = $form_state->getValue('lot_id');
     $notes      = $form_state->getValue('notes');
 
+    // Build a context label from the location or the first enrolled animal.
+    if ($form_state->getValue('animal_source') === 'location') {
+      $loc_id  = $form_state->getValue('location');
+      $loc     = !empty($loc_id) ? $this->entityTypeManager->getStorage('asset')->load($loc_id) : NULL;
+      $context = $loc ? (string) $loc->label() : '';
+    }
+    else {
+      $first   = reset($animals);
+      $context = $first ? (string) $first->label() : '';
+    }
+
     // Create a Group asset to link all generated logs for this protocol run.
-    $run_label   = (string) $this->t('@protocol — @date', [
+    $run_label = (string) $this->t('@protocol — @context — @date', [
       '@protocol' => $protocol['label'],
+      '@context'  => $context ?: (string) $this->t('unknown'),
       '@date'     => $start_date->format('Y-m-d'),
     ]);
     $group_asset = $this->createAsset([

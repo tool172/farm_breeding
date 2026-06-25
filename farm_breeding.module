@@ -543,5 +543,39 @@ function farm_breeding_views_data_alter(array &$data): void {
       $data['log__breeding_due_date']['breeding_due_date_value']['field']['id'] = 'date';
     }
   }
+
+  // Expose a "View plan" link field on log__group for the protocol runs view.
+  // Views field token substitution does not work for values from excluded fields
+  // in joined tables; this custom plugin selects the group ID directly.
+  $data['log__group']['breeding_protocol_run_link'] = [
+    'title' => t('Protocol Run: View plan link'),
+    'help'  => t('Renders a "View plan" link to the breeding protocol run detail page.'),
+    'field' => [
+      'id'             => 'breeding_protocol_run_link',
+      'click sortable' => FALSE,
+    ],
+  ];
+
+  // Expose a linked log name field for the protocol event rows.
+  // Drupal 11 Views field token substitution requires non-excluded source
+  // fields; this plugin selects id and name directly, bypassing tokens.
+  $data['log_field_data']['breeding_event_link'] = [
+    'title' => t('Protocol Event: Linked name'),
+    'help'  => t('Renders the log name as a link to its canonical page.'),
+    'field' => [
+      'id'             => 'breeding_log_name_link',
+      'click sortable' => FALSE,
+    ],
+  ];
+
+  // Expose a direct Edit link field for protocol event rows.
+  $data['log_field_data']['breeding_edit_link'] = [
+    'title' => t('Protocol Event: Edit link'),
+    'help'  => t('Renders a direct "Edit" link to the log edit page.'),
+    'field' => [
+      'id'             => 'breeding_log_edit_link',
+      'click sortable' => FALSE,
+    ],
+  ];
 }
 

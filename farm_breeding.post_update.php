@@ -93,6 +93,76 @@ function farm_breeding_post_update_import_protocol_runs_view(&$sandbox): void {
 }
 
 /**
+ * Fix View plan token: use asset_field_data.id via relationship instead of log__group.group_target_id.
+ */
+function farm_breeding_post_update_fix_view_plan_token(&$sandbox): void {
+  $view = \Drupal::entityTypeManager()->getStorage('view')->load('farm_breeding_protocol_runs');
+  if ($view) {
+    $view->delete();
+  }
+  \Drupal::service('config.installer')->installDefaultConfig('module', 'farm_breeding');
+}
+
+/**
+ * Replace protocol runs View with updated version (detail display + View plan link).
+ */
+function farm_breeding_post_update_add_protocol_detail_view(&$sandbox): void {
+  $view = \Drupal::entityTypeManager()->getStorage('view')->load('farm_breeding_protocol_runs');
+  if ($view) {
+    $view->delete();
+  }
+  \Drupal::service('config.installer')->installDefaultConfig('module', 'farm_breeding');
+}
+
+/**
+ * Replace protocol runs View: use custom ProtocolRunLink field instead of broken token.
+ */
+function farm_breeding_post_update_use_protocol_run_link_field(&$sandbox): void {
+  $view = \Drupal::entityTypeManager()->getStorage('view')->load('farm_breeding_protocol_runs');
+  if ($view) {
+    $view->delete();
+  }
+  \Drupal::service('config.installer')->installDefaultConfig('module', 'farm_breeding');
+}
+
+/**
+ * Replace protocol runs View: use LogNameLink plugin for event name links.
+ *
+ * Drupal 11 Views field token substitution ([id] / {{ id }}) requires the
+ * source field to not be excluded. Both plugins now select column values
+ * directly, bypassing the token mechanism entirely.
+ */
+function farm_breeding_post_update_use_log_name_link_field(&$sandbox): void {
+  $view = \Drupal::entityTypeManager()->getStorage('view')->load('farm_breeding_protocol_runs');
+  if ($view) {
+    $view->delete();
+  }
+  \Drupal::service('config.installer')->installDefaultConfig('module', 'farm_breeding');
+}
+
+/**
+ * Add entity operations column to protocol runs listing and detail views.
+ */
+function farm_breeding_post_update_add_operations_column(&$sandbox): void {
+  $view = \Drupal::entityTypeManager()->getStorage('view')->load('farm_breeding_protocol_runs');
+  if ($view) {
+    $view->delete();
+  }
+  \Drupal::service('config.installer')->installDefaultConfig('module', 'farm_breeding');
+}
+
+/**
+ * Replace operations dropdown with a direct Edit link on protocol run views.
+ */
+function farm_breeding_post_update_replace_operations_with_edit_link(&$sandbox): void {
+  $view = \Drupal::entityTypeManager()->getStorage('view')->load('farm_breeding_protocol_runs');
+  if ($view) {
+    $view->delete();
+  }
+  \Drupal::service('config.installer')->installDefaultConfig('module', 'farm_breeding');
+}
+
+/**
  * Install animal_stage bundle field on Animal assets (added in v1beta4).
  *
  * animal_stage belongs to the existing 'animal' bundle which farm_breeding
