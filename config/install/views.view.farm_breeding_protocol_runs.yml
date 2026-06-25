@@ -39,21 +39,18 @@ display:
           label: 'Protocol Run Group'
           required: true
       fields:
-        run_name:
-          id: run_name
-          table: asset_field_data
-          field: name
-          relationship: group_target_id
+        run_group_header:
+          id: run_group_header
+          table: log__group
+          field: breeding_protocol_run_group_header
+          relationship: none
           group_type: group
           admin_label: ''
-          entity_type: asset
-          entity_field: name
-          plugin_id: field
+          entity_type: log
+          entity_field: group
+          plugin_id: breeding_protocol_run_group_header
           label: 'Protocol Run'
           exclude: true
-          alter:
-            alter_text: false
-            make_link: false
           element_type: ''
           element_class: ''
           element_label_type: ''
@@ -66,19 +63,6 @@ display:
           hide_empty: false
           empty_zero: false
           hide_alter_empty: true
-          click_sort_column: value
-          type: string
-          settings: {  }
-          group_column: value
-          group_columns: {  }
-          group_rows: true
-          delta_limit: 0
-          delta_offset: 0
-          delta_reversed: false
-          delta_first_last: false
-          multi_type: separator
-          separator: ', '
-          field_api_classes: false
         timestamp:
           id: timestamp
           table: log_field_data
@@ -306,20 +290,20 @@ display:
         options:
           grouping:
             -
-              field: run_name
+              field: run_group_header
               rendered: true
               rendered_strip: false
           row_class: ''
           default_row_class: true
           columns:
-            run_name: run_name
+            run_group_header: run_group_header
             timestamp: timestamp
             name: name
             status: status
             operations: operations
             view_plan: view_plan
           info:
-            run_name:
+            run_group_header:
               sortable: false
               default_sort_order: asc
               align: ''
@@ -441,7 +425,7 @@ display:
     display_plugin: page
     position: 1
     display_options:
-      path: /breeding/protocols
+      path: /farm/breeding/protocols
       defaults:
         title: false
       title: 'Breeding Protocol Runs'
@@ -461,7 +445,7 @@ display:
     display_plugin: page
     position: 2
     display_options:
-      path: /breeding/protocols/%
+      path: /farm/breeding/protocols/%
       defaults:
         title: false
         fields: false
@@ -471,7 +455,18 @@ display:
         style: false
         pager: false
         relationships: false
+        header: false
       title: 'Protocol Run'
+      header:
+        breeding_protocol_run_delete_area:
+          id: breeding_protocol_run_delete_area
+          table: views
+          field: breeding_protocol_run_delete_area
+          relationship: none
+          group_type: group
+          admin_label: ''
+          plugin_id: breeding_protocol_run_delete_area
+          empty: false
       relationships: {  }
       fields:
         timestamp:

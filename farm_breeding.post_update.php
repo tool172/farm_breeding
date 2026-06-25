@@ -163,6 +163,39 @@ function farm_breeding_post_update_replace_operations_with_edit_link(&$sandbox):
 }
 
 /**
+ * Move protocol run views from /breeding/protocols to /farm/breeding/protocols.
+ */
+function farm_breeding_post_update_move_protocol_runs_path(&$sandbox): void {
+  $view = \Drupal::entityTypeManager()->getStorage('view')->load('farm_breeding_protocol_runs');
+  if ($view) {
+    $view->delete();
+  }
+  \Drupal::service('config.installer')->installDefaultConfig('module', 'farm_breeding');
+}
+
+/**
+ * Move "Delete run" into the protocol run group header (next to the run name).
+ */
+function farm_breeding_post_update_move_delete_run_to_group_header(&$sandbox): void {
+  $view = \Drupal::entityTypeManager()->getStorage('view')->load('farm_breeding_protocol_runs');
+  if ($view) {
+    $view->delete();
+  }
+  \Drupal::service('config.installer')->installDefaultConfig('module', 'farm_breeding');
+}
+
+/**
+ * Add "Delete run" link to listing view and "Delete protocol run" button to detail view.
+ */
+function farm_breeding_post_update_add_protocol_run_delete(&$sandbox): void {
+  $view = \Drupal::entityTypeManager()->getStorage('view')->load('farm_breeding_protocol_runs');
+  if ($view) {
+    $view->delete();
+  }
+  \Drupal::service('config.installer')->installDefaultConfig('module', 'farm_breeding');
+}
+
+/**
  * Install animal_stage bundle field on Animal assets (added in v1beta4).
  *
  * animal_stage belongs to the existing 'animal' bundle which farm_breeding

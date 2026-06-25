@@ -5,3 +5,12 @@ farm_breeding.settings:
     _title: 'Breeding settings'
   requirements:
     _permission: 'administer farm'
+
+farm_breeding.protocol_run_delete:
+  path: '/farm/breeding/protocols/{group_id}/delete'
+  defaults:
+    _form: 'Drupal\farm_breeding\Form\ProtocolRunDeleteForm'
+    _title: 'Delete protocol run'
+  requirements:
+    _permission: 'delete any breeding log'
+    group_id: '\d+'

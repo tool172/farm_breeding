@@ -11,8 +11,10 @@
  *  - hook_views_pre_build() → add asset name + date columns to breeding log views
  */
 
+use Drupal\Core\Entity\EntityFormInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\ViewExecutable;
 
 // ======================================================================== //
@@ -142,6 +144,105 @@ function farm_breeding_module_preuninstall(string $module): void {
       }
       $asset_storage->onFieldStorageDefinitionCreate($animal_stage_def);
     }
+  }
+}
+
+// ======================================================================== //
+// FORM HOOKS                                                                //
+// ======================================================================== //
+
+/**
+ * Implements hook_module_implements_alter().
+ *
+ * Moves farm_breeding's form_alter to run AFTER entity_reference_integrity_enforce
+ * so we can restore the delete button and add cascade-delete behavior.
+ */
+function farm_breeding_module_implements_alter(array &$implementations, string $hook): void {
+  if ($hook === 'form_alter' && isset($implementations['farm_breeding'])) {
+    $saved = $implementations['farm_breeding'];
+    unset($implementations['farm_breeding']);
+    $implementations['farm_breeding'] = $saved;
+  }
+}
+
+/**
+ * Implements hook_form_alter().
+ *
+ * On the breeding log delete form, if linked pregnancy check logs exist,
+ * replace the integrity-enforce error block with a cascade-delete warning
+ * and restore the delete button.
+ */
+function farm_breeding_form_alter(array &$form, FormStateInterface $form_state, string $form_id): void {
+  $form_object = $form_state->getFormObject();
+  if (!$form_object instanceof EntityFormInterface || $form_object->getOperation() !== 'delete') {
+    return;
+  }
+  $entity = $form_object->getEntity();
+  if ($entity->getEntityTypeId() !== 'log' || $entity->bundle() !== 'breeding') {
+    return;
+  }
+
+  $log_storage = \Drupal::entityTypeManager()->getStorage('log');
+  $pc_ids = $log_storage->getQuery()
+    ->condition('type', 'pregnancy_check')
+    ->condition('pregnancy_breeding_log', $entity->id())
+    ->accessCheck(FALSE)
+    ->execute();
+
+  if (empty($pc_ids)) {
+    return;
+  }
+
+  $items = [];
+  foreach ($log_storage->loadMultiple($pc_ids) as $pc_log) {
+    $items[] = $pc_log->label() ?: \Drupal::translation()->translate('Pregnancy check #@id', ['@id' => $pc_log->id()]);
+  }
+
+  // Replace the integrity-enforce error block with a cascade-delete warning.
+  unset($form['referencing_entities_list']);
+
+  $form['breeding_cascade_warning'] = [
+    '#weight' => -5,
+    '#prefix' => '<div class="messages messages--warning">',
+    '#markup' => \Drupal::translation()->formatPlural(
+      count($items),
+      'The following linked pregnancy check log will also be permanently deleted:',
+      'The following @count linked pregnancy check logs will also be permanently deleted:',
+    ),
+    '#suffix' => '</div>',
+  ];
+  $form['breeding_cascade_list'] = [
+    '#theme' => 'item_list',
+    '#items' => $items,
+    '#weight' => -4,
+  ];
+
+  // Restore the delete submit button removed by entity_reference_integrity_enforce.
+  $form['actions']['submit'] = [
+    '#type'        => 'submit',
+    '#value'       => \Drupal::translation()->translate('Delete'),
+    '#button_type' => 'danger',
+    '#submit'      => ['_farm_breeding_cascade_delete_preg_checks', '::submitForm'],
+    '#weight'      => 5,
+  ];
+}
+
+/**
+ * Submit handler: cascade-delete linked pregnancy check logs before the breeding log.
+ *
+ * Runs before the entity delete form's submitForm() so the integrity check
+ * finds no remaining dependents when the breeding log is deleted.
+ */
+function _farm_breeding_cascade_delete_preg_checks(array &$form, FormStateInterface $form_state): void {
+  $entity = $form_state->getFormObject()->getEntity();
+  $log_storage = \Drupal::entityTypeManager()->getStorage('log');
+  $pc_ids = $log_storage->getQuery()
+    ->condition('type', 'pregnancy_check')
+    ->condition('pregnancy_breeding_log', $entity->id())
+    ->accessCheck(FALSE)
+    ->execute();
+  if (!empty($pc_ids)) {
+    $log_storage->delete($log_storage->loadMultiple($pc_ids));
   }
 }
 
@@ -574,6 +675,28 @@ function farm_breeding_views_data_alter(array &$data): void {
     'help'  => t('Renders a direct "Edit" link to the log edit page.'),
     'field' => [
       'id'             => 'breeding_log_edit_link',
+      'click sortable' => FALSE,
+    ],
+  ];
+
+  // Expose a "Delete run" link field for the protocol runs listing.
+  $data['log__group']['breeding_protocol_run_delete_link'] = [
+    'title' => t('Protocol Run: Delete link'),
+    'help'  => t('Renders a "Delete run" link to the protocol run delete confirmation page.'),
+    'field' => [
+      'id'             => 'breeding_protocol_run_delete_link',
+      'click sortable' => FALSE,
+    ],
+  ];
+
+  // Combined group header field: run name + inline "Delete run" link.
+  // Used as the Views table grouping field so the delete link sits in the
+  // run name heading rather than repeating in every log row.
+  $data['log__group']['breeding_protocol_run_group_header'] = [
+    'title' => t('Protocol Run: Group header (name + delete link)'),
+    'help'  => t('Renders the protocol run name with an inline "Delete run" link for use as a table grouping header.'),
+    'field' => [
+      'id'             => 'breeding_protocol_run_group_header',
       'click sortable' => FALSE,
     ],
   ];

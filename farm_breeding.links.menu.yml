@@ -3,3 +3,10 @@ farm_breeding.settings:
   parent: farm.settings
   route_name: farm_breeding.settings
   description: 'Configure reproductive protocols and breeding defaults.'
+
+farm_breeding.protocols:
+  title: 'Protocol Runs'
+  parent: farm.records
+  route_name: view.farm_breeding_protocol_runs.page_1
+  description: 'Breeding protocol runs and scheduled events.'
+  weight: 10

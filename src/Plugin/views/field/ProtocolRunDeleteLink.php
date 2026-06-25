@@ -10,14 +10,13 @@ use Drupal\views\Plugin\views\field\FieldPluginBase;
 use Drupal\views\ResultRow;
 
 /**
- * Renders a "View plan" link to the breeding protocol run detail page.
+ * Renders a "Delete run" link to the protocol run delete confirmation page.
  *
- * Directly selects group_target_id from the already-joined log__group table,
- * avoiding the Views field token mechanism which does not substitute values
- * from excluded fields in joined tables.
+ * Directly selects group_target_id from the already-joined log__group table
+ * so we can build the delete URL without relying on Views field token substitution.
  */
-#[ViewsField("breeding_protocol_run_link")]
-class ProtocolRunLink extends FieldPluginBase {
+#[ViewsField("breeding_protocol_run_delete_link")]
+class ProtocolRunDeleteLink extends FieldPluginBase {
 
   public function usesGroupBy(): bool {
     return FALSE;
@@ -37,8 +36,8 @@ class ProtocolRunLink extends FieldPluginBase {
       return '';
     }
     return \Drupal::linkGenerator()->generate(
-      $this->t('View plan'),
-      Url::fromUserInput('/farm/breeding/protocols/' . $group_id),
+      $this->t('Delete run'),
+      Url::fromRoute('farm_breeding.protocol_run_delete', ['group_id' => $group_id]),
     );
   }
 
