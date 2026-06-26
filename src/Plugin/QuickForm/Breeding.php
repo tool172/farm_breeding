@@ -10,6 +10,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\farm_animal_disposition\DispositionManager;
 use Drupal\farm_location\AssetLocationInterface;
 use Drupal\farm_quick\Attribute\QuickForm;
 use Drupal\farm_quick\Plugin\QuickForm\QuickFormBase;
@@ -335,9 +336,16 @@ class Breeding extends QuickFormBase {
         $location_name = $location->label();
         $all_assets = $this->assetLocation->getAssetsByLocation([$location]);
         $females = array_values(array_filter($all_assets, function ($asset) {
-          return $asset->bundle() === 'animal'
-            && $asset->hasField('sex')
-            && $asset->get('sex')->value === 'F';
+          if ($asset->bundle() !== 'animal'
+              || !$asset->hasField('sex')
+              || $asset->get('sex')->value !== 'F') {
+            return FALSE;
+          }
+          // Exclude animals whose disposition marks them off-farm or unavailable.
+          if ($asset->hasField('disposition') && !$asset->get('disposition')->isEmpty()) {
+            return in_array($asset->get('disposition')->value, DispositionManager::BREEDING_ELIGIBLE, TRUE);
+          }
+          return TRUE; // No disposition set — treat as eligible (fail open).
         }));
       }
     }
@@ -396,11 +404,16 @@ class Breeding extends QuickFormBase {
     }
     $count = 0;
     foreach ($this->assetLocation->getAssetsByLocation([$location]) as $asset) {
-      if ($asset->bundle() === 'animal'
-          && $asset->hasField('sex')
-          && $asset->get('sex')->value === 'F') {
-        $count++;
+      if ($asset->bundle() !== 'animal'
+          || !$asset->hasField('sex')
+          || $asset->get('sex')->value !== 'F') {
+        continue;
       }
+      if ($asset->hasField('disposition') && !$asset->get('disposition')->isEmpty()
+          && !in_array($asset->get('disposition')->value, DispositionManager::BREEDING_ELIGIBLE, TRUE)) {
+        continue;
+      }
+      $count++;
     }
     return $count;
   }

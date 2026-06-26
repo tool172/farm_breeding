@@ -10,6 +10,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\farm_animal_disposition\DispositionManager;
 use Drupal\farm_location\AssetLocationInterface;
 use Drupal\farm_quick\Attribute\QuickForm;
 use Drupal\farm_quick\Plugin\QuickForm\QuickFormBase;
@@ -359,7 +360,15 @@ class ReproductiveProtocol extends QuickFormBase {
       }
       return array_values(array_filter(
         $this->assetLocation->getAssetsByLocation([$location]),
-        fn($a) => $a->bundle() === 'animal' && $a->hasField('sex') && $a->get('sex')->value === 'F'
+        function ($a) {
+          if ($a->bundle() !== 'animal' || !$a->hasField('sex') || $a->get('sex')->value !== 'F') {
+            return FALSE;
+          }
+          if ($a->hasField('disposition') && !$a->get('disposition')->isEmpty()) {
+            return in_array($a->get('disposition')->value, DispositionManager::BREEDING_ELIGIBLE, TRUE);
+          }
+          return TRUE;
+        }
       ));
     }
 
@@ -386,9 +395,16 @@ class ReproductiveProtocol extends QuickFormBase {
     }
     $count = 0;
     foreach ($this->assetLocation->getAssetsByLocation([$location]) as $asset) {
-      if ($asset->bundle() === 'animal' && $asset->hasField('sex') && $asset->get('sex')->value === 'F') {
-        $count++;
+      if ($asset->bundle() !== 'animal'
+          || !$asset->hasField('sex')
+          || $asset->get('sex')->value !== 'F') {
+        continue;
       }
+      if ($asset->hasField('disposition') && !$asset->get('disposition')->isEmpty()
+          && !in_array($asset->get('disposition')->value, DispositionManager::BREEDING_ELIGIBLE, TRUE)) {
+        continue;
+      }
+      $count++;
     }
     return $count;
   }

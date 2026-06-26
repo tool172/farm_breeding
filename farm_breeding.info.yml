@@ -14,3 +14,4 @@ dependencies:
   - farm:farm_quick
   - farm:farm_ui_views
   - log:log
+  - farm_animal_disposition:farm_animal_disposition
