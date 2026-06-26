@@ -227,3 +227,19 @@ function farm_breeding_post_update_install_animal_stage_field(&$sandbox): void {
   \Drupal::service('field_definition.listener')
     ->onFieldDefinitionCreate($field_definition);
 }
+
+/**
+ * Add heat cycle length defaults to farm_breeding.settings.
+ */
+function farm_breeding_post_update_add_heat_cycle_settings(array &$sandbox): void {
+  $config = \Drupal::configFactory()->getEditable('farm_breeding.settings');
+  if (!$config->get('heat_cycle_days')) {
+    $config->set('heat_cycle_days', [
+      'cattle' => ['typical' => 21, 'min' => 18, 'max' => 24],
+      'sheep'  => ['typical' => 17, 'min' => 14, 'max' => 19],
+      'goat'   => ['typical' => 21, 'min' => 18, 'max' => 23],
+      'pig'    => ['typical' => 21, 'min' => 19, 'max' => 23],
+      'horse'  => ['typical' => 21, 'min' => 19, 'max' => 23],
+    ])->save();
+  }
+}

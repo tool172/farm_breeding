@@ -158,3 +158,27 @@ species_aliases:
   elk: elk
   wapiti: elk
   rabbit: rabbit
+
+# Heat cycle lengths by species (days).
+# Used by farm_heat.heat_cycle_predictor to predict next estrus windows.
+heat_cycle_days:
+  cattle:
+    typical: 21
+    min: 18
+    max: 24
+  sheep:
+    typical: 17
+    min: 14
+    max: 19
+  goat:
+    typical: 21
+    min: 18
+    max: 23
+  pig:
+    typical: 21
+    min: 19
+    max: 23
+  horse:
+    typical: 21
+    min: 19
+    max: 23
